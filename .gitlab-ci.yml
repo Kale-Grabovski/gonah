@@ -1,0 +1,59 @@
+image: golang:1.21.0-alpine3.14
+
+before_script:
+    - echo ':before_script'
+    - cat /etc/os-release
+    - echo 'end :before_script'
+
+# Static Application Security Testing (SAST) is a frequently used Application Security (AppSec) tool,
+# which scans an application’s source, binary, or byte code.
+# https://www.microfocus.com/en-us/what-is/sast
+include:
+    - template: Security/SAST.gitlab-ci.yml
+
+stages:
+    - test
+    - build
+    - deploy
+
+# See CGO_ENABLED issue: https://github.com/golang/go/issues/27303
+test-backend:
+    stage: test
+    script:
+        - CGO_ENABLED=0 go test ./... -coverprofile=coverage-report.out
+        - go tool cover -html=coverage-report.out -o coverage-report.html
+        # This option allows you open a browser and check results directly: go tool cover -html=coverage-report.out
+        # You can combine test & cover commands: go test ./... -coverprofile=coverage-report.out && go tool cover -html=coverage-report.out
+        - go tool cover -func=coverage-report.out
+    artifacts:
+        paths:
+            - coverage-report.html
+        expire_in: 1 hour
+    coverage: "/\\(statements\\)\\s+\\d+.?\\d+%/"
+
+build-backend:
+    stage: build
+    script:
+        - go build -o bin/cra-generator -v .
+    artifacts:
+        paths:
+            - bin/cra-generator
+        expire_in: 1 hour
+
+pages:
+    stage: deploy
+    script:
+        - echo 'Cleaning old pages'
+        - rm -rf public
+        - ls -la
+        - mkdir -p public/test-report && cp coverage-report.html public/test-report
+        - echo 'Public directory content after copying files'
+        - ls -la ./public
+    artifacts:
+        paths:
+            - public
+        expire_in: 1 hour
+    only:
+        - master
+        - develop
+
