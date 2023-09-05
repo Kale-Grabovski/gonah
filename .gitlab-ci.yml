@@ -1,4 +1,4 @@
-mage: golang:latest
+image: golang:latest
 
 .go-cache:
     variables:
