@@ -7,4 +7,5 @@ func TestGetUserId(t *testing.T) {
 	if u.getId() != 1 {
 		t.Fatalf("wwrong userId")
 	}
+	t.Fatalf("todo shit")
 }
