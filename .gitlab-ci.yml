@@ -48,6 +48,7 @@ build:
     - chmod -R 700 ~/.ssh
     - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
+    - ls -al
     - scp -r ./$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
     - ssh $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
