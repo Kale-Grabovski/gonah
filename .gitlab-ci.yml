@@ -44,8 +44,8 @@ build:
 .deploy:
   script:
     - mkdir -p ~/.ssh
+    - eval `ssh-agent -s`
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-    - eval `ssh-add -s`
     - ssh-add ~/.ssh/id_rsa
     - chmod -R 700 ~/.ssh
     - ssh-keyscan $(hostname) >> ~/.ssh/known_hosts
