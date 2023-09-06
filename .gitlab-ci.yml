@@ -49,9 +49,6 @@ build:
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-add ~/.ssh/id_rsa
-    - ls -al
-    - echo $OUTPUT_NAME
-    - echo $CI_PROJECT_DIR/$OUTPUT_NAME
     - scp -o "StrictHostKeyChecking no" -r $OUTPUT_NAME/gonah migrations $SSH_USER@$SSH_HOST:/tmp/
     - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl stop piska && rm -rf ~/piska/migrations && mv /tmp/gonah ~/piska/ && mv /tmp/migrations ~/piska/ && sudo supervisorctl start piska'
 
