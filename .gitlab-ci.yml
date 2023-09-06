@@ -35,6 +35,3 @@ build:
   script:
     - mkdir -p $OUTPUT_NAME
     - go build -o $OUTPUT_NAME ./...
-#  artifacts:
-#    paths:
-#      - $OUTPUT_NAME
