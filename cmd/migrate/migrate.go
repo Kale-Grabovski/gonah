@@ -256,7 +256,9 @@ func (m *Migrator) MigrateTo(targetVersion int32, onCommitFailed func(err error)
 			return fmt.Errorf("unable to begin serializable transaction: %v", err)
 		}
 		// Rollback has no effect if Commit will be called
-		defer tx.Rollback(context.Background())
+		defer func() {
+			_ = tx.Rollback(context.Background())
+		}()
 
 		currentVersion, err := m.GetCurrentVersion()
 		if err != nil {
