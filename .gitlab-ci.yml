@@ -50,6 +50,7 @@ build:
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-add ~/.ssh/id_rsa
+    - ls -al $OUTPUT_NAME
     - scp -o "StrictHostKeyChecking no" -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/piska/release
     - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl stop piska && mv ~/piska/release/* ~/piska/ && sudo supervisorctl start piska'
 
