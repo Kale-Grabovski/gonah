@@ -48,8 +48,8 @@ build:
     - chmod -R 700 ~/.ssh
     - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    - scp -P$SSH_PORT -r ./$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
-    - ssh -p$SSH_PORT $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+    - scp -r ./$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - ssh $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
   image: kroniak/ssh-client
