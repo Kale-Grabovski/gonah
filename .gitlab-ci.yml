@@ -46,12 +46,13 @@ build:
     - mkdir -p ~/.ssh
     - chmod -R 700 ~/.ssh
     - eval `ssh-agent -s`
-    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
     - ssh-add ~/.ssh/id_rsa
-    - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
-    - chmod 644 ~/.ssh/known_hosts
-    - scp -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
-    - ssh -v $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+    #- ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
+    #- chmod 644 ~/.ssh/known_hosts
+    - scp -o "StrictHostKeyChecking no" -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
   image: kroniak/ssh-client
