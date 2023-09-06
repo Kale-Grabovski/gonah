@@ -35,4 +35,7 @@ build:
   stage: build
   script:
     - mkdir -p $OUTPUT_NAME
-    - go build -o $OUTPUT_NAME ./...
+    - go build -o $CI_PROJECT_DIR/$OUTPUT_NAME
+  artifacts:
+    paths:
+      - $OUTPUT_NAME
