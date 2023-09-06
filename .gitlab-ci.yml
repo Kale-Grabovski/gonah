@@ -44,14 +44,14 @@ build:
 .deploy:
   script:
     - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - chmod -R 700 ~/.ssh
     - ssh-keyscan $(hostname) >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
     - ls -al
     - ls -al $CI_PROJECT_DIR/$OUTPUT_NAME
     - rsync -av $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
-    - ssh -v -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+    - ssh -v $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
   image: kroniak/ssh-client
