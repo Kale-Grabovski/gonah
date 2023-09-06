@@ -46,7 +46,7 @@ build:
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod -R 700 ~/.ssh
-    - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
+    - ssh-keyscan $(hostname) >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
     - ls -al
     - ls -al $CI_PROJECT_DIR/$OUTPUT_NAME
