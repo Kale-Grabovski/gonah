@@ -235,7 +235,6 @@ func (m *Migrator) AppendMigration(name, upSQL, downSQL string) {
 			UpSQL:    upSQL,
 			DownSQL:  downSQL,
 		})
-	return
 }
 
 // Migrate runs pending migrations

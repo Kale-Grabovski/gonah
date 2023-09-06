@@ -31,7 +31,7 @@ var ConfigCommon = []di.Def{
 		Scope: di.App,
 		Build: func(ctx di.Container) (interface{}, error) {
 			var conf = zap.NewProductionConfig()
-			conf.Level.UnmarshalText([]byte(viper.GetString("loglevel")))
+			_ = conf.Level.UnmarshalText([]byte(viper.GetString("loglevel")))
 			conf.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 			return conf.Build()
 		},
