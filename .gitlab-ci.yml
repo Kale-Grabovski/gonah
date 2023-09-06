@@ -12,15 +12,16 @@ stages:
   - lint
   - test
   - build
-  #- release
+  - deploy-stage
+  - deploy
 
 lint:
-    image: golangci/golangci-lint:latest
-    stage: lint
-    extends: .go-cache
-    allow_failure: false
-    script:
-      - golangci-lint run -v
+  image: golangci/golangci-lint:latest
+  stage: lint
+  extends: .go-cache
+  allow_failure: false
+  script:
+    - golangci-lint run -v
 
 test:
   image: golang:latest
@@ -39,3 +40,34 @@ build:
   artifacts:
     paths:
       - $OUTPUT_NAME
+
+.deploy:
+  script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod -R 700 ~/.ssh
+    - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - scp -P$SSH_PORT -r ./$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - ssh -p$SSH_PORT $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+
+deploy-stage:
+  image: kroniak/ssh-client
+  stage: deploy-stage
+  extends: .deploy
+  environment:
+    name: stage
+    url: http://stage.project.com
+  rules:
+    - when: manual
+
+deploy:
+  image: kroniak/ssh-client
+  stage: deploy
+  extends: .deploy
+  environment:
+    name: prod
+    url: https://prod.project.com
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+    - when: manual
