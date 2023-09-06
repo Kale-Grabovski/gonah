@@ -52,8 +52,8 @@ build:
     - ls -al
     - echo $OUTPUT_NAME
     - echo $CI_PROJECT_DIR/$OUTPUT_NAME
-    - scp -o "StrictHostKeyChecking no" -r $CI_PROJECT_DIR/$OUTPUT_NAME migrations $SSH_USER@$SSH_HOST:~/piska/release
-    - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl stop piska && mv ~/piska/release/* ~/piska/ && sudo supervisorctl start piska'
+    - scp -o "StrictHostKeyChecking no" -r $OUTPUT_NAME/gonah migrations $SSH_USER@$SSH_HOST:/tmp/
+    - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl stop piska && rm -rf ~/piska/migrations && mv /tmp/gonah ~/piska/ && mv /tmp/migrations ~/piska/ && sudo supervisorctl start piska'
 
 deploy-stage:
   image: kroniak/ssh-client
