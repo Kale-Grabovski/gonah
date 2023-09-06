@@ -45,6 +45,7 @@ build:
   script:
     - mkdir -p ~/.ssh
     - eval `ssh-agent -s`
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r'
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - chmod -R 700 ~/.ssh
     - ssh-keyscan $(hostname) >> ~/.ssh/known_hosts
