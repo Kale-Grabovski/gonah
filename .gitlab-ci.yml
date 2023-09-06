@@ -50,8 +50,8 @@ build:
     - chmod 644 ~/.ssh/known_hosts
     - ls -al
     - ls -al $CI_PROJECT_DIR/$OUTPUT_NAME
-    - scp -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
-    - ssh $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+    - scp -v -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - ssh -v $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
   image: kroniak/ssh-client
