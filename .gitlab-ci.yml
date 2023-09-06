@@ -50,8 +50,8 @@ build:
     - chmod 644 ~/.ssh/known_hosts
     - ls -al
     - ls -al $CI_PROJECT_DIR/$OUTPUT_NAME
-    - scp -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
-    - ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
+    - rsync -av $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - ssh -v -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
   image: kroniak/ssh-client
