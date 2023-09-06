@@ -50,7 +50,7 @@ build:
     - ssh-add ~/.ssh/id_rsa
     - ssh-keyscan gitlab.app >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    - rsync -av $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
+    - scp -r $CI_PROJECT_DIR/$OUTPUT_NAME $SSH_USER@$SSH_HOST:~/pisk/
     - ssh -v $SSH_USER@$SSH_HOST 'sudo supervisorctl restart pisk'
 
 deploy-stage:
