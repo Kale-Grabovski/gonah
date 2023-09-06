@@ -24,7 +24,7 @@ lint:
     - golangci-lint run -v
 
 test:
-  image: golang:latest
+  image: golang:1.21.0-alpine3.18
   stage: test
   script:
     - go fmt $(go list ./... | grep -v /vendor/)
@@ -32,7 +32,7 @@ test:
     - go test -race $(go list ./... | grep -v /vendor/)
 
 build:
-  image: golang:latest
+  image: golang:1.21.0-alpine3.18
   stage: build
   script:
     - mkdir -p $OUTPUT_NAME
