@@ -58,6 +58,8 @@ func migrateDB() {
 	conn := diContainer.Get("db").(domain.DB)
 	logger := diContainer.Get("logger").(domain.Logger)
 
+	logger.Info("Starting migrations")
+
 	migrator, err := migrate.NewMigrator(conn, "schema_version")
 	if err != nil {
 		logger.Error("Unable to create a migrator", zap.Error(err))
