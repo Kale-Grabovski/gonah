@@ -41,6 +41,7 @@ build:
       - $OUTPUT_NAME
 
 .deploy:
+  image: kroniak/ssh-client
   script:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
@@ -50,24 +51,22 @@ build:
     - ssh-add ~/.ssh/id_rsa
     - scp -o "StrictHostKeyChecking no" -r $OUTPUT_NAME/gonah migrations $SSH_USER@$SSH_HOST:/tmp/
     - ssh -o "StrictHostKeyChecking no" -v $SSH_USER@$SSH_HOST 'sudo supervisorctl stop piska && rm -rf ~/piska/migrations && mv /tmp/gonah ~/piska/ && mv /tmp/migrations ~/piska/ && sudo supervisorctl start piska'
+  rules:
+    - when: manual
 
 deploy-stage:
-  image: kroniak/ssh-client
   stage: deploy-stage
   extends: .deploy
   environment:
     name: stage
     url: http://stage.project.com
-  rules:
-    - when: manual
 
 deploy:
-  image: kroniak/ssh-client
   stage: deploy
   extends: .deploy
   environment:
     name: prod
     url: https://prod.project.com
-  rules:
-    - if: '$CI_COMMIT_REF_NAME == "master"'
-    - when: manual
+  only:
+    refs:
+      - master
