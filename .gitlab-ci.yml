@@ -44,7 +44,7 @@ build:
 .deploy:
   script:
     - mkdir -p ~/.ssh
-    - chmod -R 700 ~/.ssh
+    - chmod 700 ~/.ssh
     - eval `ssh-agent -s`
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
