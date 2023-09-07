@@ -41,7 +41,6 @@ build:
       - $OUTPUT_NAME
 
 .deploy:
-  image: kroniak/ssh-client
   script:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
@@ -55,15 +54,13 @@ build:
     - when: manual
 
 deploy-stage:
+  image: kroniak/ssh-client
   stage: deploy-stage
   extends: .deploy
-  environment:
-    name: stage
-    url: http://stage.project.com
+  environment: stage
 
 deploy:
+  image: kroniak/ssh-client
   stage: deploy
   extends: .deploy
-  environment:
-    name: prod
-    url: https://prod.project.com
+  environment: prod
