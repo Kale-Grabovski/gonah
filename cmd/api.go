@@ -33,8 +33,10 @@ func runApi() {
 	logger := diContainer.Get("logger").(domain.Logger)
 	logger.Info("Starting API")
 
-	err := e.Start(viper.GetString("listen"))
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		err := e.Start(viper.GetString("listen"))
+		if err != nil {
+			panic(err)
+		}
+	}()
 }
