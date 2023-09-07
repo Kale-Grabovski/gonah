@@ -67,6 +67,3 @@ deploy:
   environment:
     name: prod
     url: https://prod.project.com
-  only:
-    refs:
-      - master
