@@ -64,3 +64,4 @@ deploy:
   stage: deploy
   extends: .deploy
   environment: prod
+  needs: ["build"]
