@@ -9,7 +9,6 @@ variables:
   OUTPUT_NAME: __bin__/$CI_PROJECT_NAME
 
 stages:
-  - lint
   - test
   - build
   - deploy-stage
@@ -17,7 +16,7 @@ stages:
 
 lint:
   image: golangci/golangci-lint:latest
-  stage: lint
+  stage: test
   extends: .go-cache
   allow_failure: false
   script:
