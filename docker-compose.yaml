@@ -1,6 +1,15 @@
 version: "3.0"
 services:
-  postgres:
+  api:
+    build: .
+    ports:
+      - "8877:8877"
+    environment:
+      WAIT_HOSTS: db:5432
+    depends_on:
+      - db
+
+  db:
     image: postgres:15.4
     command:
       - "postgres"
