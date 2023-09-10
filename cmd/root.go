@@ -4,11 +4,10 @@ import (
 	"github.com/sarulabs/di"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 
-	"github.com/Kale-Grabovski/gonah/cmd/migrate"
 	diConfig "github.com/Kale-Grabovski/gonah/src/di"
 	"github.com/Kale-Grabovski/gonah/src/domain"
+	"github.com/Kale-Grabovski/gonah/src/service/migrate"
 )
 
 var cfgFile string
@@ -25,7 +24,11 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig, initDI, migrateDB)
+	cobra.OnInitialize(initConfig, initDI, func() {
+		conn := diContainer.Get("db").(domain.DB)
+		logger := diContainer.Get("logger").(domain.Logger)
+		migrate.Run("./migrations", conn, logger)
+	})
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -52,40 +55,4 @@ func initDI() {
 		panic("Unable to build DI containers: " + err.Error())
 	}
 	diContainer = builder.Build()
-}
-
-func migrateDB() {
-	conn := diContainer.Get("db").(domain.DB)
-	logger := diContainer.Get("logger").(domain.Logger)
-
-	logger.Info("Starting migrations")
-
-	migrator, err := migrate.NewMigrator(conn, "schema_version")
-	if err != nil {
-		logger.Error("Unable to create a migrator", zap.Error(err))
-		return
-	}
-
-	err = migrator.LoadMigrations("./migrations")
-	if err != nil {
-		logger.Error("Unable to load migrations", zap.Error(err))
-		return
-	}
-
-	err = migrator.Migrate(func(err error) (retry bool) {
-		logger.Error("Commit failed during migration, retrying", zap.Error(err))
-		return true
-	})
-	if err != nil {
-		logger.Error("Unable to migrate", zap.Error(err))
-		return
-	}
-
-	ver, err := migrator.GetCurrentVersion()
-	if err != nil {
-		logger.Error("Unable to get current schema version", zap.Error(err))
-		return
-	}
-
-	logger.Info("Migration done. Current schema version", zap.Int32("ver", ver))
 }
