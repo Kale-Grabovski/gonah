@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 
 	logger.Info("Connecting to database on url: " + databaseUrl)
 
-	resource.Expire(60) // Tell docker to hard kill the container in 60 seconds
+	_ = resource.Expire(60) // Tell docker to hard kill the container in 60 seconds
 
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 	pool.MaxWait = 60 * time.Second

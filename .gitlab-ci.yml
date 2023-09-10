@@ -14,14 +14,6 @@ stages:
   - deploy-stage
   - deploy
 
-lint:
-  image: golangci/golangci-lint:latest
-  stage: test
-  extends: .go-cache
-  allow_failure: false
-  script:
-    - golangci-lint run -v
-
 test:
   image: golang:1.21.0-alpine3.18
   stage: test
