@@ -87,6 +87,8 @@ func TestMain(m *testing.M) {
 func TestUser(t *testing.T) {
 	rep := NewUserRepository(db)
 
+	login := "shit"
+
 	users, err := rep.GetAll()
 	if err != nil {
 		t.Errorf("can't get users: %v", err)
@@ -95,11 +97,11 @@ func TestUser(t *testing.T) {
 		t.Errorf("expect no users, %d returned", len(users))
 	}
 
-	user, err := rep.Create("shit")
+	user, err := rep.Create(login)
 	if err != nil {
 		t.Errorf("can't create user: %v", err)
 	}
-	if user.Login != "shit" {
+	if user.Login != login {
 		t.Errorf("wrong user: %v", err)
 	}
 
@@ -110,7 +112,7 @@ func TestUser(t *testing.T) {
 	if len(users) == 0 {
 		t.Errorf("expect users, but no returned")
 	}
-	if users[0].Login != "shit" {
+	if users[0].Login != login {
 		t.Errorf("wrong user: %v", err)
 	}
 
