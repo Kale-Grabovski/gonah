@@ -86,11 +86,44 @@ func TestMain(m *testing.M) {
 
 func TestUser(t *testing.T) {
 	rep := NewUserRepository(db)
+
+	users, err := rep.GetAll()
+	if err != nil {
+		t.Errorf("can't get users: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("expect no users, %d returned", len(users))
+	}
+
 	user, err := rep.Create("shit")
 	if err != nil {
 		t.Errorf("can't create user: %v", err)
 	}
 	if user.Login != "shit" {
 		t.Errorf("wrong user: %v", err)
+	}
+
+	users, err = rep.GetAll()
+	if err != nil {
+		t.Errorf("can't get users: %v", err)
+	}
+	if len(users) == 0 {
+		t.Errorf("expect users, but no returned")
+	}
+	if users[0].Login != "shit" {
+		t.Errorf("wrong user: %v", err)
+	}
+
+	err = rep.Delete(users[0].Id)
+	if err != nil {
+		t.Errorf("can't delete user: %v", err)
+	}
+
+	users, err = rep.GetAll()
+	if err != nil {
+		t.Errorf("can't get users: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("expect no users after delete, %d returned", len(users))
 	}
 }
