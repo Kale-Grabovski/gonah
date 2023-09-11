@@ -51,12 +51,16 @@ func (s *UsersAction) GetById(c echo.Context) (err error) {
 }
 
 func (s *UsersAction) Create(c echo.Context) (err error) {
-	login := c.FormValue("login")
-	if login == "" {
+	user := &domain.User{}
+
+	if err = c.Bind(user); err != nil {
 		return c.String(http.StatusBadRequest, "login required")
 	}
+	if err = c.Validate(user); err != nil {
+		return err
+	}
 
-	q, err := s.userRepo.GetByLogin(login)
+	q, err := s.userRepo.GetByLogin(user.Login)
 	if err != nil {
 		s.logger.Error("cannot check if user exists", zap.Error(err))
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
@@ -65,7 +69,7 @@ func (s *UsersAction) Create(c echo.Context) (err error) {
 		return c.String(http.StatusBadRequest, "user with such login already exists")
 	}
 
-	user, err := s.userRepo.Create(login)
+	err = s.userRepo.Create(user)
 	if err != nil {
 		s.logger.Error("cannot create user", zap.Error(err))
 		return c.String(http.StatusInternalServerError, "Internal Server Error")

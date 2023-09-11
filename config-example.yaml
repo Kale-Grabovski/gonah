@@ -1,4 +1,4 @@
 loglevel: debug
-listen: 0.0.0.0:8080
+listen: 0.0.0.0:8877
 db:
-  dsn: postgres://pguser:pgpwd@localhost/pgdb?sslmode=disable&pool_max_conns=10
+  dsn: postgres://pguser:pgpwd@localhost:5435/pgdb?sslmode=disable&pool_max_conns=10

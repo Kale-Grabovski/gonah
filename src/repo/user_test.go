@@ -97,7 +97,10 @@ func TestUser(t *testing.T) {
 		t.Errorf("expect no users, %d returned", len(users))
 	}
 
-	user, err := rep.Create(login)
+	user := &domain.User{
+		Login: login,
+	}
+	err = rep.Create(user)
 	if err != nil {
 		t.Errorf("can't create user: %v", err)
 	}

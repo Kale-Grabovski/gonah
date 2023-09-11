@@ -33,10 +33,9 @@ func (r *UserRepo) GetAll() (ret []domain.User, err error) {
 	return
 }
 
-func (r *UserRepo) Create(login string) (user domain.User, err error) {
-	user.Login = login
+func (r *UserRepo) Create(user *domain.User) (err error) {
 	q := `INSERT INTO users (login) VALUES ($1) RETURNING id`
-	err = r.db.QueryRow(context.Background(), q, login).Scan(&user.Id)
+	err = r.db.QueryRow(context.Background(), q, user.Login).Scan(&user.Id)
 	return
 }
 
