@@ -1,0 +1,62 @@
+name: run-tests
+on:
+  push:
+    branches: ["master"]
+# on:
+#  pull_request:
+env:
+  GO_VERSION: 1.21.0
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    #runs-on: self-hosted
+    steps:
+    - name: set up go ${{env.GO_VERSION}}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{env.GO_VERSION}}
+      id: go
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+    - name: Build
+      run: go build -o gonah
+    - name: Tests
+      run: go test -count=1 -v ./...
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: set up go ${{env.GO_VERSION}}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{env.GO_VERSION}}
+      - name: Build
+        run: go build -o gonah
+      - name: Archive binary and migrations
+        run: tar -cvf deploy.tar gonah migrations
+      - name: Copy archive to remote machine
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy.tar"
+          target: "/tmp/deploy.tar"
+      - name: Restart service
+        uses: D3rHase/ssh-command-action@v0.2.2
+        host: ${{ secrets.SSH_HOST }}
+        user: ${{ secrets.SSH_USER }}
+        private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          sudo supervisorctl stop piska
+          rm -rf ~/piska/migrations
+          tar -C ~/piska/ -xf /tmp/deploy.tar
+          rm /tmp/deploy.tar
+          sudo supervisorctl start piska
