@@ -51,12 +51,13 @@ jobs:
           target: "/tmp/deploy.tar"
       - name: Restart service
         uses: D3rHase/ssh-command-action@v0.2.2
-        host: ${{ secrets.SSH_HOST }}
-        user: ${{ secrets.SSH_USER }}
-        private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          sudo supervisorctl stop piska
-          rm -rf ~/piska/migrations
-          tar -C ~/piska/ -xf /tmp/deploy.tar
-          rm /tmp/deploy.tar
-          sudo supervisorctl start piska
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          user: ${{ secrets.SSH_USER }}
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command: |
+            sudo supervisorctl stop piska
+            rm -rf ~/piska/migrations
+            tar -C ~/piska/ -xf /tmp/deploy.tar
+            rm /tmp/deploy.tar
+            sudo supervisorctl start piska
