@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 1
       - name: Build
-        run: go build -o gonah
+        run: CGO_ENABLED=0 go build -o gonah
       - name: Archive binary and migrations
         run: tar -cf deploy.tar gonah migrations
       - name: Copy archive to remote machine
