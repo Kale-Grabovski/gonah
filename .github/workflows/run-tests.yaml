@@ -6,8 +6,8 @@ env:
   GO_VERSION: 1.21.1
   test:
     name: Run Tests
-    runs-on: ubuntu-latest
-    # runs-on: self-hosted
+    #runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - name: set up go ${{env.GO_VERSION}}
       uses: actions/setup-go@v1
