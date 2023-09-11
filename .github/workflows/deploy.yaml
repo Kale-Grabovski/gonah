@@ -12,11 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     #runs-on: self-hosted
     steps:
-    - name: set up go ${{env.GO_VERSION}}
+    - name: Set up go to test ${{env.GO_VERSION}}
       uses: actions/setup-go@v4
       with:
         go-version: ${{env.GO_VERSION}}
-      id: go
     - name: Check out code into the Go module directory
       uses: actions/checkout@v4
       with:
@@ -29,14 +28,16 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: set up go ${{env.GO_VERSION}}
+      - name: Set up go to deploy ${{env.GO_VERSION}}
         uses: actions/setup-go@v4
         with:
           go-version: ${{env.GO_VERSION}}
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: Build
         run: go build -o gonah
       - name: Archive binary and migrations
