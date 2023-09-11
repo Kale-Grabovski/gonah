@@ -41,7 +41,7 @@ jobs:
       - name: Build
         run: go build -o gonah
       - name: Archive binary and migrations
-        run: tar -cvf deploy.tar gonah migrations
+        run: tar -cf deploy.tar gonah migrations
       - name: Copy archive to remote machine
         uses: appleboy/scp-action@master
         with:
@@ -56,9 +56,10 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           user: ${{ secrets.SSH_USER }}
           private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # semicolons are required
           command: |
-            sudo supervisorctl stop piska
-            rm -rf ~/piska/migrations
-            tar -C ~/piska/ -xf /tmp/deploy.tar
-            rm /tmp/deploy.tar
-            sudo supervisorctl start piska
+            sudo supervisorctl stop piska;
+            rm -rf ~/piska/migrations;
+            tar -C ~/piska/ -xf /tmp/deploy.tar;
+            rm /tmp/deploy.tar;
+            sudo supervisorctl start piska;
