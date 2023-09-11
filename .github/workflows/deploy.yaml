@@ -27,6 +27,7 @@ jobs:
 
   deploy:
     needs: test
+    environment: prod
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
