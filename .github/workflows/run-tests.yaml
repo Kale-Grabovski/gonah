@@ -1,5 +1,7 @@
 name: run-tests
-on: [push]
+on:
+  push:
+    branches: ["master"]
 # on:
 #  pull_request:
 env:
