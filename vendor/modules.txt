@@ -303,6 +303,8 @@ golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 ## explicit
+# gopkg.in/go-playground/assert.v1 v1.2.1
+## explicit
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
