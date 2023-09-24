@@ -9,7 +9,6 @@ import (
 	"github.com/go-playground/validator"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/Kale-Grabovski/gonah/src/api"
 	"github.com/Kale-Grabovski/gonah/src/domain"
@@ -52,7 +51,8 @@ func runApi() {
 	logger.Info("Starting API")
 
 	go func() {
-		err := e.Start(":" + viper.GetString("listen"))
+		cfg := diContainer.Get("config").(*domain.Config)
+		err := e.Start(":" + cfg.Listen)
 		if err != nil {
 			panic(err)
 		}

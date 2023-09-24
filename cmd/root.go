@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/sarulabs/di"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -24,7 +26,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig, initDI, func() {
+	cobra.OnInitialize(initConfigAndDI, func() {
 		conn := diContainer.Get("db").(domain.DB)
 		logger := diContainer.Get("logger").(domain.Logger)
 		migrate.Run("./migrations", conn, logger)
@@ -34,25 +36,37 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile == "" {
-		cfgFile = "config.yaml"
-	}
-
-	viper.AutomaticEnv()
-	viper.SetConfigFile(cfgFile)
-	err := viper.ReadInConfig()
-	if err != nil {
-		panic("Error occurred while reading config file\n")
-	}
-}
-
-func initDI() {
+func initConfigAndDI() {
 	builder, _ := di.NewBuilder()
-	err := builder.Add(diConfig.Config...)
+	cfgDI := di.Def{
+		Name:  "config",
+		Scope: di.App,
+		Build: func(ctx di.Container) (interface{}, error) {
+			return initConfig()
+		},
+	}
+	err := builder.Add(append([]di.Def{cfgDI}, diConfig.Config...)...)
 	if err != nil {
 		panic("Unable to build DI containers: " + err.Error())
 	}
 	diContainer = builder.Build()
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() (*domain.Config, error) {
+	if cfgFile == "" {
+		cfgFile = "config.yaml"
+	}
+	viper.AutomaticEnv()
+	viper.SetConfigFile(cfgFile)
+	err := viper.ReadInConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error occurred while reading config file: %v", err)
+	}
+	var config *domain.Config
+	err = viper.Unmarshal(&config)
+	if err != nil {
+		return nil, fmt.Errorf("cannot unmarshal config file: %v", err)
+	}
+	return config, nil
 }
