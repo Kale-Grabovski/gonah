@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/go-playground/validator"
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
 
@@ -40,6 +41,9 @@ func init() {
 func runApi() {
 	e := echo.New()
 	e.Validator = &CustomValidator{validator: validator.New()}
+
+	e.Use(echoprometheus.NewMiddleware("gonah"))
+	e.GET("/metrics", echoprometheus.NewHandler())
 
 	users := diContainer.Get("api.users").(*api.UsersAction)
 	e.GET("/api/v1/users", users.GetAll)
