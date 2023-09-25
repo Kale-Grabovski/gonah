@@ -6,11 +6,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/go-playground/validator"
-	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
 
+	"github.com/Kale-Grabovski/gonah/cmd/middleware"
 	"github.com/Kale-Grabovski/gonah/src/api"
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
@@ -42,8 +43,11 @@ func runApi() {
 	e := echo.New()
 	e.Validator = &CustomValidator{validator: validator.New()}
 
-	e.Use(echoprometheus.NewMiddleware("gonah"))
-	e.GET("/metrics", echoprometheus.NewHandler())
+	e.Use((&middleware.Victoria{}).Process)
+	e.GET("/metrics", func(c echo.Context) (err error) {
+		metrics.WritePrometheus(c.Response(), true)
+		return nil
+	})
 
 	users := diContainer.Get("api.users").(*api.UsersAction)
 	e.GET("/api/v1/users", users.GetAll)
