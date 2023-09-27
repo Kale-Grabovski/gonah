@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 
 	"github.com/Kale-Grabovski/gonah/src/domain"
@@ -44,7 +45,8 @@ func TestMain(m *testing.M) {
 
 	var confPath string
 	var stopDB func() // cannot use defer because of os.Exit
-	confPath, stopDB = startPostgreSQL(logger)
+	confPath, stopDB = startPostgreSQL(pool, logger)
+	startKafka(pool, logger)
 
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err = os.Chdir("../..")
@@ -70,7 +72,7 @@ func TestMain(m *testing.M) {
 	client := httpClient{}
 	for attempt < 20 {
 		attempt++
-		_, _, err = client.sendJsonReq("GET", "http://localhost:8877/api/v1/users/0", []byte{})
+		_, _, err = client.sendJsonReq("GET", "http://localhost:8877/api/v1/users", []byte{})
 		if err != nil {
 			logger.Error("client.sendJsonReq failed: %v, waiting...", zap.Error(err))
 			time.Sleep(1 * time.Second)
@@ -96,13 +98,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func startPostgreSQL(logger domain.Logger) (confPath string, cleaner func()) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		logger.Error("dockertest.NewPool failed", zap.Error(err))
-		return
-	}
-
+func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) (confPath string, cleaner func()) {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "15",
@@ -124,6 +120,36 @@ func startPostgreSQL(logger domain.Logger) (confPath string, cleaner func()) {
 
 	connString := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
 	return waitForDBMS(pool, resource, connString, logger)
+}
+
+func startKafka(pool *dockertest.Pool, logger domain.Logger) {
+	_, err := pool.RunWithOptions(&dockertest.RunOptions{
+		Repository: "bashj79/kafka-kraft",
+	}, func(config *docker.HostConfig) {
+		// set AutoRemove to true so that stopped container goes away by itself
+		config.AutoRemove = true
+		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
+	})
+	if err != nil {
+		logger.Error("could not start kafka", zap.Error(err))
+		return
+	}
+
+	retryFn := func() error {
+		conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", "shit", 0)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		message := kafka.Message{Value: []byte("Hello World")}
+		_, err = conn.WriteMessages(message)
+		return err
+	}
+
+	if err = pool.Retry(retryFn); err != nil {
+		logger.Error("could not connect to kafka", zap.Error(err))
+	}
 }
 
 func waitForDBMS(
@@ -160,6 +186,8 @@ loglevel: debug
 listen: 8877
 db:
   dsn: {{.ConnString}}
+kafka:
+  host: kafka:9092
 `)
 	if err != nil {
 		_ = pool.Purge(resource)
