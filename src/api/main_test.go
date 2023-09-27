@@ -125,6 +125,7 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) (confPath stri
 func startKafka(pool *dockertest.Pool, logger domain.Logger) {
 	_, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "bashj79/kafka-kraft",
+		Hostname:   "kafka",
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
