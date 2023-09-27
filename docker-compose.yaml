@@ -1,18 +1,21 @@
 version: "3.8"
 services:
-  api:
-    build: .
-    ports:
-      - "8877:8877"
-    environment:
-      WAIT_HOSTS: db:5432
-    networks:
-      - vm_net
-    depends_on:
-      - db
+#  api:
+#    build: .
+#    container_name: gonah
+#    ports:
+#      - "8877:8877"
+#    environment:
+#      WAIT_HOSTS: db:5432
+#    networks:
+#      - vm_net
+#    depends_on:
+#      - db
+#      - kafka
 
   db:
     image: postgres:15.4
+    container_name: postgres
     command:
       - "postgres"
       - "-c"
@@ -184,11 +187,20 @@ services:
     networks:
       - vm_net
 
+  kafka:
+    container_name: kafka
+    image: bashj79/kafka-kraft
+    ports:
+      - "9092:9092"
+    networks:
+      - vm_net
+
 volumes:
   dat: {}
   vmagentdata: {}
   vmdata: {}
   grafanadata: {}
   victorialogs-fluentbit: {}
+
 networks:
   vm_net:

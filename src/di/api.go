@@ -6,6 +6,7 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/api"
 	"github.com/Kale-Grabovski/gonah/src/domain"
 	"github.com/Kale-Grabovski/gonah/src/repo"
+	"github.com/Kale-Grabovski/gonah/src/service"
 )
 
 var ConfigApi = []di.Def{
@@ -15,7 +16,8 @@ var ConfigApi = []di.Def{
 		Build: func(ctx di.Container) (interface{}, error) {
 			usersRepo := ctx.Get("repo.user").(*repo.UserRepo)
 			logger := ctx.Get("logger").(domain.Logger)
-			return api.NewUsersAction(usersRepo, logger), nil
+			kaf := ctx.Get("service.kafka").(*service.Kafka)
+			return api.NewUsersAction(usersRepo, kaf, logger), nil
 		},
 	},
 }
