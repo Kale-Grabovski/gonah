@@ -32,6 +32,9 @@ func TestUser(t *testing.T) {
 	resp, respBody, err = client.sendJsonReq(http.MethodGet, "http://localhost:8877/api/v1/users", nil)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var users []domain.User
+	err = json.Unmarshal(respBody, &users)
+	require.Equal(t, 1, len(users))
 
 	// READ
 	resp, respBody, err = client.sendJsonReq(http.MethodGet, fmt.Sprintf("http://localhost:8877/api/v1/users/%d", respUser.Id), []byte{})
