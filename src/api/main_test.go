@@ -160,11 +160,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	return
 }
 
-func waitForDBMS(
-	connString string,
-	kafkaHost string,
-	logger domain.Logger,
-) (confPath string, cleaner func()) {
+func waitForDBMS(connString, kafkaHost string, logger domain.Logger) {
 	// DBMS needs some time to start.
 	// Port forwarding always works, thus net.Dial can't be used here.
 	attempt := 0
@@ -226,15 +222,6 @@ kafka:
 	if err != nil {
 		logger.Panic("confFile.Close failed", zap.Error(err))
 	}
-
-	cleanerFunc := func() {
-		err = os.Remove(confFile.Name())
-		if err != nil {
-			logger.Panic("os.Remove failed", zap.Error(err))
-		}
-	}
-
-	return confFile.Name(), cleanerFunc
 }
 
 func (cl *httpClient) sendJsonReq(method, url string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {
