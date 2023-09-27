@@ -37,21 +37,22 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		logger.Panic("Could not construct pool", zap.Error(err))
 	}
-
 	err = pool.Client.Ping()
 	if err != nil {
 		logger.Panic("Could not connect to Docker", zap.Error(err))
 	}
 
-	var stopDB func() // cannot use defer because of os.Exit
 	kafkaHost := startKafka(pool, logger)
 	dbConnString := startPostgreSQL(pool, logger)
-	confFilename := waitForDBMS(dbConnString, kafkaHost, logger)
+	waitForDBMS(dbConnString, logger)
+	confFilename := createConfig(dbConnString, kafkaHost, logger)
+	startAPI(m, confFilename, logger)
+}
 
+func startAPI(m *testing.M, confFilename string, logger domain.Logger) {
 	// We should change directory, otherwise the service will not find `migrations` directory
-	err = os.Chdir("../..")
+	err := os.Chdir("../..")
 	if err != nil {
-		stopDB()
 		logger.Panic("os.Chdir failed", zap.Error(err))
 	}
 
@@ -60,7 +61,6 @@ func TestMain(m *testing.M) {
 	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	if err != nil {
-		stopDB()
 		logger.Panic("cmd.Start failed", zap.Error(err))
 	}
 
@@ -84,7 +84,6 @@ func TestMain(m *testing.M) {
 	}
 
 	if !ok {
-		stopDB()
 		_ = cmd.Process.Kill()
 		logger.Panic("REST API is unavailable")
 		return
@@ -94,7 +93,6 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	_ = cmd.Process.Signal(syscall.SIGTERM)
-	stopDB()
 	os.Exit(code)
 }
 
@@ -159,14 +157,14 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	return
 }
 
-func waitForDBMS(connString, kafkaHost string, logger domain.Logger) string {
+func waitForDBMS(dbConn string, logger domain.Logger) {
 	// DBMS needs some time to start.
 	// Port forwarding always works, thus net.Dial can't be used here.
 	attempt := 0
 	ok := false
 	for attempt < 20 {
 		attempt++
-		conn, err := pgx.Connect(context.Background(), connString)
+		conn, err := pgx.Connect(context.Background(), dbConn)
 		if err != nil {
 			logger.Info("pgx.Connect failed", zap.Error(err))
 			time.Sleep(1 * time.Second)
@@ -181,7 +179,9 @@ func waitForDBMS(connString, kafkaHost string, logger domain.Logger) string {
 	if !ok {
 		logger.Panic("couldn't connect to PostgreSQL")
 	}
+}
 
+func createConfig(dbConn, kafkaConn string, logger domain.Logger) string {
 	tmpl, err := template.New("config").Parse(`
 loglevel: debug
 listen: 8877
@@ -198,8 +198,8 @@ kafka:
 		ConnString string
 		KafkaHost  string
 	}{
-		ConnString: connString,
-		KafkaHost:  kafkaHost,
+		ConnString: dbConn,
+		KafkaHost:  kafkaConn,
 	}
 	var configBuff bytes.Buffer
 	err = tmpl.Execute(&configBuff, configArgs)
