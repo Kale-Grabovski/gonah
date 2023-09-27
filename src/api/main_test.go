@@ -124,8 +124,11 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger, kafkaHost stri
 
 func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository:   "bashj79/kafka-kraft",
-		Hostname:     "kafka",
+		Repository: "bashj79/kafka-kraft",
+		Hostname:   "kafka",
+		PortBindings: map[docker.Port][]docker.PortBinding{
+			"9092/tcp": {{HostIP: "localhost", HostPort: "9092/tcp"}},
+		},
 		ExposedPorts: []string{"9092/tcp"},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
