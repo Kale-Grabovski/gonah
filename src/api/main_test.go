@@ -43,11 +43,10 @@ func TestMain(m *testing.M) {
 		logger.Panic("Could not connect to Docker", zap.Error(err))
 	}
 
-	var confPath string
 	var stopDB func() // cannot use defer because of os.Exit
 	kafkaHost := startKafka(pool, logger)
 	dbConnString := startPostgreSQL(pool, logger)
-	waitForDBMS(dbConnString, kafkaHost, logger)
+	confFilename := waitForDBMS(dbConnString, kafkaHost, logger)
 
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err = os.Chdir("../..")
@@ -56,7 +55,7 @@ func TestMain(m *testing.M) {
 		logger.Panic("os.Chdir failed", zap.Error(err))
 	}
 
-	cmd := exec.Command("./gonah", "api", "--config", confPath)
+	cmd := exec.Command("./gonah", "api", "--config", confFilename)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Start()
@@ -160,7 +159,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	return
 }
 
-func waitForDBMS(connString, kafkaHost string, logger domain.Logger) {
+func waitForDBMS(connString, kafkaHost string, logger domain.Logger) string {
 	// DBMS needs some time to start.
 	// Port forwarding always works, thus net.Dial can't be used here.
 	attempt := 0
@@ -222,6 +221,7 @@ kafka:
 	if err != nil {
 		logger.Panic("confFile.Close failed", zap.Error(err))
 	}
+	return confFile.Name()
 }
 
 func (cl *httpClient) sendJsonReq(method, url string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {
