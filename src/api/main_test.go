@@ -45,8 +45,8 @@ func TestMain(m *testing.M) {
 
 	var confPath string
 	var stopDB func() // cannot use defer because of os.Exit
-	confPath, stopDB = startPostgreSQL(pool, logger)
-	startKafka(pool, logger)
+	kafkaHost := startKafka(pool, logger)
+	confPath, stopDB = startPostgreSQL(pool, logger, kafkaHost)
 
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err = os.Chdir("../..")
@@ -98,7 +98,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) (confPath string, cleaner func()) {
+func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger, kafkaHost string) (confPath string, cleaner func()) {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "15",
@@ -119,11 +119,11 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) (confPath stri
 	}
 
 	connString := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
-	return waitForDBMS(pool, resource, connString, logger)
+	return waitForDBMS(pool, resource, connString, kafkaHost, logger)
 }
 
-func startKafka(pool *dockertest.Pool, logger domain.Logger) {
-	_, err := pool.RunWithOptions(&dockertest.RunOptions{
+func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository:   "bashj79/kafka-kraft",
 		Hostname:     "kafka",
 		ExposedPorts: []string{"9092/tcp"},
@@ -136,9 +136,10 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) {
 		logger.Error("could not start kafka", zap.Error(err))
 		return
 	}
+	host = resource.GetHostPort("9092/tcp")
 
 	retryFn := func() error {
-		conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", "shit", 0)
+		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit", 0)
 		if err != nil {
 			return err
 		}
@@ -152,12 +153,14 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) {
 	if err = pool.Retry(retryFn); err != nil {
 		logger.Error("could not connect to kafka", zap.Error(err))
 	}
+	return
 }
 
 func waitForDBMS(
 	pool *dockertest.Pool,
 	resource *dockertest.Resource,
 	connString string,
+	kafkaHost string,
 	logger domain.Logger,
 ) (confPath string, cleaner func()) {
 	// DBMS needs some time to start.
@@ -189,7 +192,7 @@ listen: 8877
 db:
   dsn: {{.ConnString}}
 kafka:
-  host: kafka:9092
+  host: {{.KafkaHost}}
 `)
 	if err != nil {
 		_ = pool.Purge(resource)
@@ -198,8 +201,10 @@ kafka:
 
 	configArgs := struct {
 		ConnString string
+		KafkaHost  string
 	}{
 		ConnString: connString,
+		KafkaHost:  kafkaHost,
 	}
 	var configBuff bytes.Buffer
 	err = tmpl.Execute(&configBuff, configArgs)
