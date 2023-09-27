@@ -46,7 +46,8 @@ func TestMain(m *testing.M) {
 	var confPath string
 	var stopDB func() // cannot use defer because of os.Exit
 	kafkaHost := startKafka(pool, logger)
-	confPath, stopDB = startPostgreSQL(pool, logger, kafkaHost)
+	dbConnString := startPostgreSQL(pool, logger)
+	waitForDBMS(dbConnString, kafkaHost, logger)
 
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err = os.Chdir("../..")
@@ -98,7 +99,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger, kafkaHost string) (confPath string, cleaner func()) {
+func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "15",
@@ -115,11 +116,11 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger, kafkaHost stri
 	})
 	if err != nil {
 		logger.Error("Could not start resource", zap.Error(err))
-		return
+		return ""
 	}
 
 	connString := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
-	return waitForDBMS(pool, resource, connString, kafkaHost, logger)
+	return connString
 }
 
 func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
@@ -160,8 +161,6 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 }
 
 func waitForDBMS(
-	pool *dockertest.Pool,
-	resource *dockertest.Resource,
 	connString string,
 	kafkaHost string,
 	logger domain.Logger,
@@ -185,7 +184,6 @@ func waitForDBMS(
 	}
 
 	if !ok {
-		_ = pool.Purge(resource)
 		logger.Panic("couldn't connect to PostgreSQL")
 	}
 
@@ -198,7 +196,6 @@ kafka:
   host: {{.KafkaHost}}
 `)
 	if err != nil {
-		_ = pool.Purge(resource)
 		logger.Panic("template.Parse failed", zap.Error(err))
 	}
 
@@ -212,35 +209,25 @@ kafka:
 	var configBuff bytes.Buffer
 	err = tmpl.Execute(&configBuff, configArgs)
 	if err != nil {
-		_ = pool.Purge(resource)
 		logger.Panic("tmpl.Execute failed", zap.Error(err))
 	}
 
 	confFile, err := os.CreateTemp("", "config.*.yaml")
 	if err != nil {
-		_ = pool.Purge(resource)
 		logger.Panic("ioutil.TempFile failed", zap.Error(err))
 	}
 
 	_, err = confFile.WriteString(configBuff.String())
 	if err != nil {
-		_ = pool.Purge(resource)
 		logger.Panic("confFile.WriteString failed", zap.Error(err))
 	}
 
 	err = confFile.Close()
 	if err != nil {
-		_ = pool.Purge(resource)
 		logger.Panic("confFile.Close failed", zap.Error(err))
 	}
 
 	cleanerFunc := func() {
-		// purge the container
-		err := pool.Purge(resource)
-		if err != nil {
-			logger.Panic("pool.Purge failed", zap.Error(err))
-		}
-
 		err = os.Remove(confFile.Name())
 		if err != nil {
 			logger.Panic("os.Remove failed", zap.Error(err))
