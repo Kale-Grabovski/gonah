@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		logger.Panic("Could not connect to Docker", zap.Error(err))
 	}
-	pool.MaxWait = 120 * time.Second
+	pool.MaxWait = 180 * time.Second
 
 	kafkaHost := startKafka(pool, logger)
 	dbConnString := startPostgreSQL(pool, logger)
