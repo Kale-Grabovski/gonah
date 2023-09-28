@@ -21,6 +21,20 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
+var configTpl = `
+loglevel: debug
+listen: 8877
+db:
+  dsn: {{.ConnString}}
+kafka:
+  host: {{.KafkaHost}}
+`
+
+type configArgs struct {
+	ConnString string
+	KafkaHost  string
+}
+
 // http.Client wrapper for adding new methods, particularly sendJsonReq
 type httpClient struct {
 	parent http.Client
@@ -41,10 +55,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		logger.Panic("Could not connect to Docker", zap.Error(err))
 	}
+	pool.MaxWait = 120 * time.Second
 
 	kafkaHost := startKafka(pool, logger)
 	dbConnString := startPostgreSQL(pool, logger)
-	waitForDBMS(dbConnString, logger)
 	confFilename := createConfig(dbConnString, kafkaHost, logger)
 	startAPI(m, confFilename, logger)
 }
@@ -112,12 +126,22 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		logger.Error("Could not start resource", zap.Error(err))
-		return ""
+		logger.Panic("Could not start resource", zap.Error(err))
 	}
 
-	connString := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
-	return connString
+	databaseUrl := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
+
+	if err = pool.Retry(func() error {
+		db, err := pgx.Connect(context.Background(), databaseUrl)
+		if err != nil {
+			return err
+		}
+		return db.Ping(context.Background())
+	}); err != nil {
+		logger.Panic("Could not connect to docker", zap.Error(err))
+	}
+
+	return databaseUrl
 }
 
 func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
@@ -139,8 +163,8 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	}
 	host = resource.GetHostPort("9092/tcp")
 
-	retryFn := func() error {
-		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit", 0)
+	if err = pool.Retry(func() error {
+		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit-topic", 0)
 		if err != nil {
 			return err
 		}
@@ -149,60 +173,24 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		message := kafka.Message{Value: []byte("Hello World")}
 		_, err = conn.WriteMessages(message)
 		return err
-	}
-
-	if err = pool.Retry(retryFn); err != nil {
+	}); err != nil {
 		logger.Error("could not connect to kafka", zap.Error(err))
 	}
 	return
 }
 
-func waitForDBMS(dbConn string, logger domain.Logger) {
-	// DBMS needs some time to start.
-	// Port forwarding always works, thus net.Dial can't be used here.
-	attempt := 0
-	ok := false
-	for attempt < 20 {
-		attempt++
-		conn, err := pgx.Connect(context.Background(), dbConn)
-		if err != nil {
-			logger.Info("pgx.Connect failed", zap.Error(err))
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		_ = conn.Close(context.Background())
-		ok = true
-		break
-	}
-
-	if !ok {
-		logger.Panic("couldn't connect to PostgreSQL")
-	}
-}
-
 func createConfig(dbConn, kafkaConn string, logger domain.Logger) string {
-	tmpl, err := template.New("config").Parse(`
-loglevel: debug
-listen: 8877
-db:
-  dsn: {{.ConnString}}
-kafka:
-  host: {{.KafkaHost}}
-`)
+	tmpl, err := template.New("config").Parse(configTpl)
 	if err != nil {
 		logger.Panic("template.Parse failed", zap.Error(err))
 	}
 
-	configArgs := struct {
-		ConnString string
-		KafkaHost  string
-	}{
+	args := configArgs{
 		ConnString: dbConn,
 		KafkaHost:  kafkaConn,
 	}
 	var configBuff bytes.Buffer
-	err = tmpl.Execute(&configBuff, configArgs)
+	err = tmpl.Execute(&configBuff, args)
 	if err != nil {
 		logger.Panic("tmpl.Execute failed", zap.Error(err))
 	}
