@@ -21,6 +21,15 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
+type httpClient struct {
+	parent http.Client
+}
+
+type configArgs struct {
+	ConnString string
+	KafkaHost  string
+}
+
 var configTpl = `
 loglevel: debug
 listen: 8877
@@ -29,16 +38,6 @@ db:
 kafka:
   host: {{.KafkaHost}}
 `
-
-type configArgs struct {
-	ConnString string
-	KafkaHost  string
-}
-
-// http.Client wrapper for adding new methods, particularly sendJsonReq
-type httpClient struct {
-	parent http.Client
-}
 
 func TestMain(m *testing.M) {
 	logger, err := domain.NewLogger()
@@ -86,9 +85,9 @@ func startAPI(m *testing.M, confFilename string, logger domain.Logger) {
 	client := httpClient{}
 	for attempt < 20 {
 		attempt++
-		_, _, err = client.sendJsonReq("GET", "http://localhost:8877/api/v1/users", []byte{})
+		_, _, err = client.sendJsonReq(http.MethodGet, "http://localhost:8877/api/v1/users", []byte{})
 		if err != nil {
-			logger.Error("client.sendJsonReq failed: %v, waiting...", zap.Error(err))
+			logger.Warn("client.sendJsonReq failed: %v, waiting...", zap.Error(err))
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -100,7 +99,6 @@ func startAPI(m *testing.M, confFilename string, logger domain.Logger) {
 	if !ok {
 		_ = cmd.Process.Kill()
 		logger.Panic("REST API is unavailable")
-		return
 	}
 
 	// Run all tests
@@ -126,7 +124,7 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		logger.Panic("Could not start resource", zap.Error(err))
+		logger.Panic("Could not start postgres resource", zap.Error(err))
 	}
 
 	databaseUrl := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
@@ -158,8 +156,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		logger.Error("could not start kafka", zap.Error(err))
-		return
+		logger.Panic("could not start kafka", zap.Error(err))
 	}
 	host = resource.GetHostPort("9092/tcp")
 
@@ -174,7 +171,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		_, err = conn.WriteMessages(message)
 		return err
 	}); err != nil {
-		logger.Error("could not connect to kafka", zap.Error(err))
+		logger.Panic("could not connect to kafka", zap.Error(err))
 	}
 	return
 }
