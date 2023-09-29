@@ -21,6 +21,8 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
+const containersExpireSec = 60
+
 type httpClient struct {
 	parent http.Client
 }
@@ -126,6 +128,7 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 	if err != nil {
 		logger.Panic("Could not start postgres resource", zap.Error(err))
 	}
+	resource.Expire(containersExpireSec)
 
 	databaseUrl := "postgres://usr:secret@" + resource.GetHostPort("5432/tcp") + "/dbname?sslmode=disable"
 
@@ -158,6 +161,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	if err != nil {
 		logger.Panic("could not start kafka", zap.Error(err))
 	}
+	resource.Expire(containersExpireSec)
 	host = resource.GetHostPort("9092/tcp")
 
 	if err = pool.Retry(func() error {

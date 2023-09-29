@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
@@ -34,30 +36,33 @@ func (s *Kafka) Connect(ctx context.Context, topic string, partition int) (*kafk
 	s.topics = append(s.topics, conn)
 	s.topicsMu.Unlock()
 
-	go s.Consume(ctx, topic, partition)
+	go s.Consume(ctx, topic)
 	return conn, nil
 }
 
-func (s *Kafka) Consume(ctx context.Context, topic string, partition int) {
-	conn, err := kafka.DialLeader(ctx, "tcp", s.cfg.Kafka.Host, topic, partition)
-	if err != nil {
-		s.logger.Error("cannot connect to topic "+topic, zap.Error(err))
+func (s *Kafka) Consume(ctx context.Context, topic string) {
+	r := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:          []string{s.cfg.Kafka.Host},
+		GroupID:          "users-group",
+		Topic:            topic,
+		MinBytes:         1,
+		MaxBytes:         10e6, // 10MB
+		ReadBatchTimeout: 10 * time.Millisecond,
+	})
+
+	for {
+		m, err := r.ReadMessage(ctx)
+		if err != nil {
+			break
+		}
+		fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
+	}
+
+	if err := r.Close(); err != nil {
+		s.logger.Error("failed to close reader", zap.Error(err))
 		return
 	}
-
-	s.topicsMu.Lock()
-	s.topics = append(s.topics, conn)
-	s.topicsMu.Unlock()
-
-	b := make([]byte, 10e3) // 10KB max per message
-	for {
-		n, err := conn.Read(b)
-		if err != nil {
-			//s.logger.Error("cannot read from topic "+topic, zap.Error(err))
-			return
-		}
-		s.logger.Info("consumer", zap.ByteString("users", b[:n]))
-	}
+	fmt.Println("close consumer")
 }
 
 func (s *Kafka) CloseTopics() {
