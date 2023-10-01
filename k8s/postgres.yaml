@@ -18,7 +18,7 @@ metadata:
     ver: itwl-pv
 spec:
   capacity:
-    storage: 200Mi
+    storage: 400Mi
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -41,7 +41,7 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 200Mi
+      storage: 400Mi
 
 ---
 

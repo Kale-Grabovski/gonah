@@ -1,5 +1,5 @@
 loglevel: debug
-apiPort: 8878
+apiPort: 8877
 db:
   dsn: postgres://pguser:pgpwd@postgres:5432/pgdb?sslmode=disable&pool_max_conns=10
 kafka:
