@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -21,25 +21,15 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
-const containersExpireSec = 60
+const (
+	containersExpireSec = 30
+	dbPort              = "5439"
+	kafkaPort           = "9092/tcp" // doesn't work on another ports
+)
 
 type httpClient struct {
 	parent http.Client
 }
-
-type configArgs struct {
-	ConnString string
-	KafkaHost  string
-}
-
-var configTpl = `
-loglevel: debug
-listen: 8877
-db:
-  dsn: {{.ConnString}}
-kafka:
-  host: {{.KafkaHost}}
-`
 
 func TestMain(m *testing.M) {
 	logger, err := domain.NewLogger()
@@ -50,33 +40,50 @@ func TestMain(m *testing.M) {
 	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
 	pool, err := dockertest.NewPool("")
 	if err != nil {
-		logger.Panic("Could not construct pool", zap.Error(err))
+		logger.Panic("could not construct pool", zap.Error(err))
 	}
 	err = pool.Client.Ping()
 	if err != nil {
-		logger.Panic("Could not connect to Docker", zap.Error(err))
+		logger.Panic("could not connect to Docker", zap.Error(err))
 	}
-	pool.MaxWait = 180 * time.Second
+	pool.MaxWait = containersExpireSec * time.Second
 
-	kafkaHost := startKafka(pool, logger)
-	dbConnString := startPostgreSQL(pool, logger)
-	confFilename := createConfig(dbConnString, kafkaHost, logger)
-	startAPI(m, confFilename, logger)
+	var (
+		kafkaHost, dbConnString string
+		wg                      sync.WaitGroup
+	)
+	wg.Add(2)
+
+	go func() {
+		kafkaHost = startKafka(pool, logger)
+		wg.Done()
+	}()
+	go func() {
+		dbConnString = startPostgreSQL(pool, logger)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	startAPI(m, logger, dbConnString, kafkaHost)
 }
 
-func startAPI(m *testing.M, confFilename string, logger domain.Logger) {
+func startAPI(m *testing.M, logger domain.Logger, dbConn, kafkaHost string) {
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err := os.Chdir("../..")
 	if err != nil {
 		logger.Panic("os.Chdir failed", zap.Error(err))
 	}
 
-	cmd := exec.Command("./gonah", "api", "--config", confFilename)
+	cmd := exec.Command("./gonah", "api")
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_APIPORT=8877")
+	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_DB_DSN="+dbConn)
+	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_KAFKA_HOST="+kafkaHost)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	if err != nil {
-		logger.Panic("cmd.Start failed", zap.Error(err))
+		logger.Panic("failed to start api", zap.Error(err))
 	}
 
 	// We have to make sure the migration is finished and REST API is available before running any tests.
@@ -93,7 +100,6 @@ func startAPI(m *testing.M, confFilename string, logger domain.Logger) {
 			time.Sleep(1 * time.Second)
 			continue
 		}
-
 		ok = true
 		break
 	}
@@ -120,13 +126,17 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 			"POSTGRES_DB=dbname",
 			"listen_addresses = '*'",
 		},
+		PortBindings: map[docker.Port][]docker.PortBinding{
+			dbPort: {{HostIP: "localhost", HostPort: "5432/tcp"}},
+		},
+		ExposedPorts: []string{"5432"},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		logger.Panic("Could not start postgres resource", zap.Error(err))
+		logger.Panic("could not start postgres", zap.Error(err))
 	}
 	resource.Expire(containersExpireSec)
 
@@ -139,7 +149,7 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 		}
 		return db.Ping(context.Background())
 	}); err != nil {
-		logger.Panic("Could not connect to docker", zap.Error(err))
+		logger.Panic("could not connect to postgres", zap.Error(err))
 	}
 
 	return databaseUrl
@@ -150,9 +160,9 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		Repository: "bashj79/kafka-kraft",
 		Hostname:   "kafka",
 		PortBindings: map[docker.Port][]docker.PortBinding{
-			"9092/tcp": {{HostIP: "localhost", HostPort: "9092/tcp"}},
+			kafkaPort: {{HostIP: "localhost", HostPort: kafkaPort}},
 		},
-		ExposedPorts: []string{"9092/tcp"},
+		ExposedPorts: []string{kafkaPort},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
@@ -162,7 +172,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		logger.Panic("could not start kafka", zap.Error(err))
 	}
 	resource.Expire(containersExpireSec)
-	host = resource.GetHostPort("9092/tcp")
+	host = resource.GetHostPort(kafkaPort)
 
 	if err = pool.Retry(func() error {
 		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit-topic", 0)
@@ -178,39 +188,6 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		logger.Panic("could not connect to kafka", zap.Error(err))
 	}
 	return
-}
-
-func createConfig(dbConn, kafkaConn string, logger domain.Logger) string {
-	tmpl, err := template.New("config").Parse(configTpl)
-	if err != nil {
-		logger.Panic("template.Parse failed", zap.Error(err))
-	}
-
-	args := configArgs{
-		ConnString: dbConn,
-		KafkaHost:  kafkaConn,
-	}
-	var configBuff bytes.Buffer
-	err = tmpl.Execute(&configBuff, args)
-	if err != nil {
-		logger.Panic("tmpl.Execute failed", zap.Error(err))
-	}
-
-	confFile, err := os.CreateTemp("", "config.*.yaml")
-	if err != nil {
-		logger.Panic("ioutil.TempFile failed", zap.Error(err))
-	}
-
-	_, err = confFile.WriteString(configBuff.String())
-	if err != nil {
-		logger.Panic("confFile.WriteString failed", zap.Error(err))
-	}
-
-	err = confFile.Close()
-	if err != nil {
-		logger.Panic("confFile.Close failed", zap.Error(err))
-	}
-	return confFile.Name()
 }
 
 func (cl *httpClient) sendJsonReq(method, url string, reqBody []byte) (resp *http.Response, resBody []byte, err error) {

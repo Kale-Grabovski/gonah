@@ -60,7 +60,7 @@ func runApi() {
 
 	go func() {
 		cfg := diContainer.Get("config").(*domain.Config)
-		err := e.Start(":" + cfg.Listen)
+		err := e.Start(":" + cfg.ApiPort)
 		if err != nil {
 			panic(err)
 		}

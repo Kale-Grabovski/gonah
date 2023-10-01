@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sarulabs/di"
 	"github.com/spf13/cobra"
@@ -54,11 +55,15 @@ func initConfigAndDI() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() (*domain.Config, error) {
-	if cfgFile == "" {
-		cfgFile = "config.yaml"
-	}
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+	viper.SetEnvPrefix(domain.EnvPrefix)
+
+	if cfgFile == "" {
+		cfgFile = "config-example.yaml"
+	}
 	viper.SetConfigFile(cfgFile)
+
 	err := viper.ReadInConfig()
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while reading config file: %v", err)

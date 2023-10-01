@@ -1,8 +1,10 @@
 package domain
 
+const EnvPrefix = "GONAH"
+
 type Config struct {
 	LogLevel string `yaml:"logLevel"`
-	Listen   string `yaml:"listen"`
+	ApiPort  string `yaml:"apiPort"`
 	DB       struct {
 		DSN string `yaml:"dsn"`
 	} `yaml:"db"`
