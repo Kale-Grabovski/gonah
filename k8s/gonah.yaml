@@ -18,10 +18,10 @@ spec:
     spec:
       containers:
         - name: gonah
-          image: pzdc/gonah:v1.1.1
+          image: pzdc/gonah:v1.1.9
           env:
             - name: GONAH_DB_DSN
-              value: postgres://pguser:pgpwd@postgres-service-np.default.svc:5432/pgdb?sslmode=disable&pool_max_conns=10
+              value: postgres://pguser:pgpwd@postgres-service-np.default.svc:5435/pgdb?sslmode=disable&pool_max_conns=10
             - name: GONAH_APIPORT
               value: "8877"
           ports:

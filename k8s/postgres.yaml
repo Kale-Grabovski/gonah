@@ -90,11 +90,9 @@ kind: Service
 metadata:
   name: postgres-service-np
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: psql
   ports:
-    - name: psql
-      port: 5432
-      nodePort: 30100
-      protocol: TCP
+    - port: 5435
+      targetPort: 5432

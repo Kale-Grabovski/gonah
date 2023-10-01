@@ -24,12 +24,13 @@ docker-compose up
 docker login http://localhost:5000
 ```
 
-Push container to custom registry:
+Push container to registry:
+
 ```bash
 docker ps | grep gonah # get containerID
-docker container commit {{containerID}} gonah:v1
-docker image tag gonah:v1 localhost:5000/gonah:v1
-docker image push localhost:5000/gonah:v1
+docker build -t gonah:v1.1.2 .
+docker image tag gonah:v1.1.2 pzdc/gonah:v1.1.2
+docker image push pzdc/gonah:v1.1.2
 ```
 
 ```bash
@@ -40,6 +41,12 @@ kubectl create secret generic regcred \
 
 To run gitlab deployment set `SSH_*` variables at project settings and
 change ssh-command to restart the process (see `.gitlab-ci.yml`).
+
+Get service url for localhost when `minikube` is used:
+
+```bash
+minikube service gonah-service --url
+```
 
 Run tests:
 
