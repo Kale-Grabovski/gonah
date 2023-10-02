@@ -1,14 +1,12 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 
 	"github.com/Kale-Grabovski/gonah/src/domain"
@@ -17,9 +15,9 @@ import (
 )
 
 type UsersAction struct {
-	userRepo   *repo.UserRepo
-	usersTopic *kafka.Conn
-	logger     domain.Logger
+	userRepo *repo.UserRepo
+	usersCh  chan []byte
+	logger   domain.Logger
 }
 
 func NewUsersAction(
@@ -27,11 +25,12 @@ func NewUsersAction(
 	kafka *service.Kafka,
 	logger domain.Logger,
 ) *UsersAction {
-	usersTopic, err := kafka.Connect(context.Background(), "users", 0)
+	usersCh := make(chan []byte, 50)
+	err := kafka.GetProducer("users", 0, usersCh)
 	if err != nil {
 		logger.Error("failed to connect to topic", zap.Error(err))
 	}
-	return &UsersAction{userRepo, usersTopic, logger}
+	return &UsersAction{userRepo, usersCh, logger}
 }
 
 func (s *UsersAction) Up(c echo.Context) (err error) {
@@ -50,11 +49,7 @@ func (s *UsersAction) GetAll(c echo.Context) (err error) {
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 	u, _ := json.Marshal(users)
-	_, err = s.usersTopic.WriteMessages(kafka.Message{Value: u})
-	if err != nil {
-		s.logger.Error("cannot send users to kafka", zap.Error(err))
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
+	s.usersCh <- u
 	return c.JSON(http.StatusOK, users)
 }
 

@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/jackc/pgx/v4"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
-	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 
 	"github.com/Kale-Grabovski/gonah/src/domain"
@@ -148,12 +148,13 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 	return databaseUrl
 }
 
-func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
+func startKafka(pool *dockertest.Pool, logger domain.Logger) (kafkaHost string) {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "bashj79/kafka-kraft",
+		Repository: "bitnami/kafka",
+		Tag:        "3.5",
 		Hostname:   "kafka",
 		PortBindings: map[docker.Port][]docker.PortBinding{
-			"9092/tcp": {{HostIP: "localhost", HostPort: "9092/tcp"}},
+			"9092/tcp": {{HostIP: "localhost", HostPort: "9095/tcp"}},
 		},
 		ExposedPorts: []string{"9092/tcp"},
 	}, func(config *docker.HostConfig) {
@@ -165,17 +166,18 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		logger.Panic("could not start kafka", zap.Error(err))
 	}
 	resource.Expire(containersExpireSec)
-	host = resource.GetHostPort("9092/tcp")
+	kafkaHost = resource.GetHostPort("9092/tcp")
 
 	if err = pool.Retry(func() error {
-		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit-topic", 0)
+		p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": kafkaHost})
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
-		message := kafka.Message{Value: []byte("Hello World")}
-		_, err = conn.WriteMessages(message)
-		return err
+		topic := "shit"
+		return p.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value:          []byte("shit"),
+		}, nil)
 	}); err != nil {
 		logger.Panic("could not connect to kafka", zap.Error(err))
 	}

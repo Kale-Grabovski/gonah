@@ -17,7 +17,7 @@ var ConfigService = []di.Def{
 			return service.NewKafka(cfg, logger), nil
 		},
 		Close: func(obj interface{}) error {
-			obj.(*service.Kafka).CloseTopics()
+			obj.(*service.Kafka).Close()
 			return nil
 		},
 	},

@@ -7,7 +7,7 @@ services:
       - "8877:8877"
     environment:
       GONAH_DB_DSN: postgres://pguser:pgpwd@db:5432/pgdb?sslmode=disable&pool_max_conns=10
-      GONAH_KAFKA_HOST: kafka:9099
+      GONAH_KAFKA_HOST: kafka:9092
       GONAH_APIPORT: 8877
     networks:
       - shit_net
@@ -176,17 +176,20 @@ services:
     image: bitnami/kafka:3.5
     hostname: kafka
     ports:
-      - "9099:9092"
+      - "9092:9092"
     volumes:
-      - "kafka_data:/bitnami/kafka"
+      - kafka_dat:/bitnami
     environment:
+      # KRaft settings
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # Listeners
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     networks:
       - shit_net
 
@@ -208,7 +211,7 @@ services:
 volumes:
   dat: {}
   vmdata: {}
-  kafka_data: {}
+  kafka_dat: {}
   vmagentdata: {}
   grafanadata: {}
   victorialogs-fluentbit: {}

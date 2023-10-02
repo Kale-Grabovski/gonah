@@ -1,74 +1,104 @@
 package service
 
 import (
-	"context"
-	"fmt"
-	"sync"
 	"time"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
 
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
+const (
+	producerFlushMs   = 300
+	consumerTimeoutMs = 100
+	closeSleepMs      = 500 // should be > producerFlushMs + consumerTimeoutMs
+)
+
 type Kafka struct {
-	cfg      *domain.Config
-	logger   domain.Logger
-	topics   []*kafka.Conn
-	topicsMu sync.Mutex
+	cfg          *domain.Config
+	logger       domain.Logger
+	consumerDone chan struct{}
+	producerDone chan struct{}
 }
 
 func NewKafka(cfg *domain.Config, logger domain.Logger) *Kafka {
 	return &Kafka{
-		cfg:    cfg,
-		logger: logger,
+		cfg:          cfg,
+		logger:       logger,
+		consumerDone: make(chan struct{}),
+		producerDone: make(chan struct{}),
 	}
 }
 
-func (s *Kafka) Connect(ctx context.Context, topic string, partition int) (*kafka.Conn, error) {
-	conn, err := kafka.DialLeader(ctx, "tcp", s.cfg.Kafka.Host, topic, partition)
+func (s *Kafka) GetProducer(topic string, partition int32, ch <-chan []byte) error {
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": s.cfg.Kafka.Host})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	s.topicsMu.Lock()
-	s.topics = append(s.topics, conn)
-	s.topicsMu.Unlock()
-
-	go s.Consume(ctx, topic)
-	return conn, nil
+	go func() {
+		if partition == 0 {
+			partition = kafka.PartitionAny
+		}
+		for {
+			select {
+			case m := <-ch:
+				err = producer.Produce(&kafka.Message{
+					TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: partition},
+					Value:          m,
+				}, nil)
+				if err != nil {
+					s.logger.Error("cannot producer a message", zap.Error(err))
+				}
+			case <-s.producerDone:
+				producer.Flush(producerFlushMs)
+				producer.Close()
+				s.logger.Info("producer closed")
+				return
+			default:
+			}
+		}
+	}()
+	go s.Consume(topic)
+	return nil
 }
 
-func (s *Kafka) Consume(ctx context.Context, topic string) {
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:          []string{s.cfg.Kafka.Host},
-		GroupID:          "users-group",
-		Topic:            topic,
-		MinBytes:         1,
-		MaxBytes:         10e6, // 10MB
-		ReadBatchTimeout: 10 * time.Millisecond,
+func (s *Kafka) Consume(topic string) {
+	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": s.cfg.Kafka.Host,
+		"group.id":          "pizdec",
+		"auto.offset.reset": "latest",
+		"fetch.min.bytes":   "1",
 	})
-
-	for {
-		m, err := r.ReadMessage(ctx)
-		if err != nil {
-			break
-		}
-		fmt.Printf("message at topic/partition/offset %v/%v/%v: %s = %s\n", m.Topic, m.Partition, m.Offset, string(m.Key), string(m.Value))
-	}
-
-	if err := r.Close(); err != nil {
-		s.logger.Error("failed to close reader", zap.Error(err))
+	if err != nil {
+		s.logger.Error("cannot create consumer", zap.Error(err))
 		return
 	}
-	fmt.Println("close consumer")
+
+	consumer.SubscribeTopics([]string{topic}, nil)
+
+	for {
+		msg, err := consumer.ReadMessage(consumerTimeoutMs * time.Millisecond)
+		if err == nil {
+			s.logger.Info("kafka consumer", zap.ByteString("msg", msg.Value))
+		} else if !err.(kafka.Error).IsTimeout() {
+			s.logger.Error("consumer error", zap.Error(err))
+			break
+		}
+
+		select {
+		case <-s.consumerDone:
+			consumer.Close()
+			s.logger.Info("consumer closed")
+			return
+		default:
+		}
+	}
 }
 
-func (s *Kafka) CloseTopics() {
-	s.topicsMu.Lock()
-	defer s.topicsMu.Unlock()
-	for _, topic := range s.topics {
-		topic.Close()
-	}
+func (s *Kafka) Close() {
+	s.consumerDone <- struct{}{}
+	s.producerDone <- struct{}{}
+	time.Sleep(closeSleepMs * time.Millisecond)
 }
