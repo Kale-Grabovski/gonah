@@ -60,7 +60,7 @@ func (s *Kafka) GetProducer(topic string, partition int32, ch <-chan []byte) err
 			}
 		}
 	}()
-	go s.Consume(topic)
+	//go s.Consume(topic)
 	return nil
 }
 
