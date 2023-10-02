@@ -50,6 +50,7 @@ func runApi() {
 	})
 
 	users := diContainer.Get("api.users").(*api.UsersAction)
+	e.GET("/up", users.Up)
 	e.GET("/api/v1/users", users.GetAll)
 	e.GET("/api/v1/users/:id", users.GetById)
 	e.POST("/api/v1/users", users.Create)

@@ -14,6 +14,12 @@ func NewUserRepository(db domain.DB) *UserRepo {
 	return &UserRepo{db}
 }
 
+func (r *UserRepo) Ready() (ready string, err error) {
+	q := `SELECT 'OK'`
+	err = r.db.QueryRow(context.Background(), q).Scan(&ready)
+	return
+}
+
 func (r *UserRepo) GetAll() (ret []domain.User, err error) {
 	q := `SELECT id, login FROM users ORDER BY id`
 	rows, err := r.db.Query(context.Background(), q)

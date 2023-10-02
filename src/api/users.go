@@ -34,6 +34,15 @@ func NewUsersAction(
 	return &UsersAction{userRepo, usersTopic, logger}
 }
 
+func (s *UsersAction) Up(c echo.Context) (err error) {
+	ready, err := s.userRepo.Ready()
+	if err != nil {
+		s.logger.Error("not ready", zap.Error(err))
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	return c.JSON(http.StatusOK, ready)
+}
+
 func (s *UsersAction) GetAll(c echo.Context) (err error) {
 	users, err := s.userRepo.GetAll()
 	if err != nil {

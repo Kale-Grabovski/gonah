@@ -21,11 +21,7 @@ import (
 	"github.com/Kale-Grabovski/gonah/src/domain"
 )
 
-const (
-	containersExpireSec = 30
-	dbPort              = "5439"
-	kafkaPort           = "9092/tcp" // doesn't work on another ports
-)
+const containersExpireSec = 30
 
 type httpClient struct {
 	parent http.Client
@@ -49,25 +45,26 @@ func TestMain(m *testing.M) {
 	pool.MaxWait = containersExpireSec * time.Second
 
 	var (
-		kafkaHost, dbConnString string
-		wg                      sync.WaitGroup
+		kafkaConn string
+		dbConn    string
+		wg        sync.WaitGroup
 	)
 	wg.Add(2)
 
 	go func() {
-		kafkaHost = startKafka(pool, logger)
+		kafkaConn = startKafka(pool, logger)
 		wg.Done()
 	}()
 	go func() {
-		dbConnString = startPostgreSQL(pool, logger)
+		dbConn = startPostgreSQL(pool, logger)
 		wg.Done()
 	}()
 	wg.Wait()
 
-	startAPI(m, logger, dbConnString, kafkaHost)
+	startAPI(m, logger, dbConn, kafkaConn)
 }
 
-func startAPI(m *testing.M, logger domain.Logger, dbConn, kafkaHost string) {
+func startAPI(m *testing.M, logger domain.Logger, dbConn, kafkaConn string) {
 	// We should change directory, otherwise the service will not find `migrations` directory
 	err := os.Chdir("../..")
 	if err != nil {
@@ -78,42 +75,42 @@ func startAPI(m *testing.M, logger domain.Logger, dbConn, kafkaHost string) {
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_APIPORT=8877")
 	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_DB_DSN="+dbConn)
-	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_KAFKA_HOST="+kafkaHost)
+	cmd.Env = append(cmd.Env, domain.EnvPrefix+"_KAFKA_HOST="+kafkaConn)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	if err != nil {
 		logger.Panic("failed to start api", zap.Error(err))
 	}
+	waitAPI(cmd, logger)
 
-	// We have to make sure the migration is finished and REST API is available before running any tests.
-	// Otherwise, there might be a race condition - the test see that API is unavailable and terminates,
-	// pruning Docker container in the process which was running a migration.
-	attempt := 0
+	// Run all tests
+	code := m.Run()
+	_ = cmd.Process.Signal(syscall.SIGTERM)
+	os.Exit(code)
+}
+
+// We have to make sure the migration is finished and REST API is available before running any tests.
+// Otherwise, there might be a race condition - the test see that API is unavailable and terminates,
+// pruning Docker container in the process which was running a migration.
+func waitAPI(cmd *exec.Cmd, logger domain.Logger) {
 	ok := false
+	attempt := 0
 	client := httpClient{}
 	for attempt < 20 {
 		attempt++
-		_, _, err = client.sendJsonReq(http.MethodGet, "http://localhost:8877/api/v1/users", []byte{})
-		if err != nil {
-			logger.Warn("client.sendJsonReq failed: %v, waiting...", zap.Error(err))
-			time.Sleep(1 * time.Second)
-			continue
+		_, _, err := client.sendJsonReq(http.MethodGet, "http://localhost:8877/up", []byte{})
+		if err == nil {
+			ok = true
+			break
 		}
-		ok = true
-		break
+		logger.Warn("client.sendJsonReq failed: %v, waiting...", zap.Error(err))
+		time.Sleep(200 * time.Millisecond)
 	}
-
 	if !ok {
 		_ = cmd.Process.Kill()
 		logger.Panic("REST API is unavailable")
 	}
-
-	// Run all tests
-	code := m.Run()
-
-	_ = cmd.Process.Signal(syscall.SIGTERM)
-	os.Exit(code)
 }
 
 func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
@@ -126,10 +123,6 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 			"POSTGRES_DB=dbname",
 			"listen_addresses = '*'",
 		},
-		PortBindings: map[docker.Port][]docker.PortBinding{
-			dbPort: {{HostIP: "localhost", HostPort: "5432/tcp"}},
-		},
-		ExposedPorts: []string{"5432"},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
@@ -157,12 +150,9 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 
 func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "bashj79/kafka-kraft",
-		Hostname:   "kafka",
-		PortBindings: map[docker.Port][]docker.PortBinding{
-			kafkaPort: {{HostIP: "localhost", HostPort: kafkaPort}},
-		},
-		ExposedPorts: []string{kafkaPort},
+		Repository:   "bashj79/kafka-kraft",
+		Hostname:     "kafka",
+		ExposedPorts: []string{"9092"},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
@@ -172,7 +162,7 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 		logger.Panic("could not start kafka", zap.Error(err))
 	}
 	resource.Expire(containersExpireSec)
-	host = resource.GetHostPort(kafkaPort)
+	host = resource.GetHostPort("9092/tcp")
 
 	if err = pool.Retry(func() error {
 		conn, err := kafka.DialLeader(context.Background(), "tcp", host, "shit-topic", 0)
@@ -180,7 +170,6 @@ func startKafka(pool *dockertest.Pool, logger domain.Logger) (host string) {
 			return err
 		}
 		defer conn.Close()
-
 		message := kafka.Message{Value: []byte("Hello World")}
 		_, err = conn.WriteMessages(message)
 		return err
@@ -195,7 +184,6 @@ func (cl *httpClient) sendJsonReq(method, url string, reqBody []byte) (resp *htt
 	if err != nil {
 		return nil, nil, err
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err = cl.parent.Do(req)
@@ -205,9 +193,5 @@ func (cl *httpClient) sendJsonReq(method, url string, reqBody []byte) (resp *htt
 	defer resp.Body.Close()
 
 	resBody, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return resp, resBody, nil
+	return resp, resBody, err
 }
