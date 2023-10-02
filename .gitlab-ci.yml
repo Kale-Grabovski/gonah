@@ -15,7 +15,7 @@ stages:
   - deploy
 
 test:
-  image: golang:1.21.0-alpine3.18
+  image: golang:1.21.1
   stage: test
   script:
     - go fmt $(go list ./... | grep -v /vendor/)
@@ -23,11 +23,11 @@ test:
     - go test $(go list ./... | grep -v /vendor/)
 
 build:
-  image: golang:1.21.0-alpine3.18
+  image: golang:1.21.1
   stage: build
   script:
     - mkdir -p $OUTPUT_NAME
-    - go build -o $CI_PROJECT_DIR/$OUTPUT_NAME
+    - CGO_ENABLED=1 go build -o $CI_PROJECT_DIR/$OUTPUT_NAME
   artifacts:
     paths:
       - $OUTPUT_NAME
