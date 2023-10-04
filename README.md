@@ -53,3 +53,11 @@ Run tests:
 ```bash
 make test
 ```
+
+Port forward and cluster tailf:
+
+```bash
+k port-forward statefulset/gonah 8879:8877 
+k logs -f -l app=gonah
+curl http://localhost:8879/api/v1/users
+```

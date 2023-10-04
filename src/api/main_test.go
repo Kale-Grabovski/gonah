@@ -123,6 +123,10 @@ func startPostgreSQL(pool *dockertest.Pool, logger domain.Logger) string {
 			"POSTGRES_DB=dbname",
 			"listen_addresses = '*'",
 		},
+		PortBindings: map[docker.Port][]docker.PortBinding{
+			"5432/tcp": {{HostIP: "localhost", HostPort: "5435/tcp"}},
+		},
+		ExposedPorts: []string{"5432/tcp"},
 	}, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true

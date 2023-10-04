@@ -90,7 +90,7 @@ kind: Service
 metadata:
   name: postgres-service-np
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: psql
   ports:
