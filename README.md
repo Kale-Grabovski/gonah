@@ -45,6 +45,7 @@ change ssh-command to restart the process (see `.gitlab-ci.yml`).
 Get service url for localhost when `minikube` is used:
 
 ```bash
+minikube start --driver=docker --disk-size=2gb --memory=3g
 minikube service gonah-service --url
 ```
 
@@ -57,7 +58,16 @@ make test
 Port forward and cluster tailf:
 
 ```bash
+k run dns --rm -ti --image registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3 -- bash
 k port-forward statefulset/gonah 8879:8877 
 k logs -f -l app=gonah
 curl http://localhost:8879/api/v1/users
+```
+
+Helm:
+
+```bash
+helm dep update k8s/helm/gonah
+helm dep build k8s/helm/gonah
+helm install k8s/helm/gonah
 ```
